@@ -23,7 +23,9 @@ Open `templates/landing.html` and make these replacements:
 |------|-------------|
 | `{{ url_for('static', filename='css/style.css') }}?v=3` | `static/css/style.css?v=3` |
 | `{{ url_for('static', filename='css/landing.css') }}?v=1` | `static/css/landing.css?v=1` |
-| `{{ url_for('static', filename='js/auth.js') }}` | `static/js/auth.js` |
+| `{{ url_for('static', filename='js/auth.js') }}` | `./static/js/auth.js` |
+
+> **⚠️ CRITICAL:** The `import Auth from` line must use `./static/js/auth.js` (with the `./` prefix). Without it, the browser cannot resolve the path and the entire login page breaks!
 
 ### 1.2 — Convert `templates/index.html` → static HTML
 
@@ -32,7 +34,9 @@ Open `templates/index.html` and make these replacements:
 | Find | Replace with |
 |------|-------------|
 | `{{ url_for('static', filename='css/style.css') }}?v=4` | `static/css/style.css?v=4` |
-| `{{ url_for('static', filename='js/game.js') }}?v=4` | `static/js/game.js?v=4` |
+| `{{ url_for('static', filename='js/game.js') }}?v=4` | `./static/js/game.js?v=4` |
+
+> **⚠️ CRITICAL:** The script `src` must use `./static/js/game.js` (with the `./` prefix). Without it, the browser won't load the game JavaScript!
 
 ### 1.3 — Move HTML files to the root
 
