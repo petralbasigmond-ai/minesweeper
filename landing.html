@@ -1,0 +1,253 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Minesweeper — Welcome, Miner!</title>
+    <link rel="stylesheet" href="static/css/style.css?v=3">
+    <link rel="stylesheet" href="static/css/landing.css?v=1">
+    <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>💎</text></svg>">
+</head>
+<body>
+
+    <!-- Background -->
+    <div class="background"></div>
+    <canvas id="particleCanvas"></canvas>
+    <canvas id="landingCanvas"></canvas>
+
+    <!-- Landing Wrapper -->
+    <div class="landing-wrapper">
+
+        <!-- Auth Card -->
+        <div class="landing-card">
+
+            <div class="landing-title">
+                <h1>⛏️ MINESWEEPER</h1>
+                <span class="sub">Mine &amp; Conquer</span>
+            </div>
+
+            <div class="landing-divider"></div>
+
+            <!-- How to Play Button -->
+            <div class="landing-instructions">
+                <button class="how-to-play-btn" id="howToPlayBtn">📖 How to Play</button>
+            </div>
+
+            <!-- How to Play Modal -->
+            <div class="modal-overlay" id="howToPlayModal">
+                <div class="modal">
+                    <h2>📖 How to Play</h2>
+                    <ul>
+                        <li>Clear the minefield without detonating any bombs</li>
+                        <li>Numbers tell you how many bombs are adjacent</li>
+                        <li>Use Eyes to Reveal Secret Boxes</li>
+                        <li>Complete Easy to unlock Medium, then Hard!</li>
+                        <li>Your progress is saved automatically</li>
+                    </ul>
+                    <button class="modal-close" id="closeHowToPlay">Got it!</button>
+                </div>
+            </div>
+
+            <!-- Auth Tabs -->
+            <div class="auth-tabs">
+                <button class="auth-tab active" data-tab="login">🔑 Login</button>
+                <button class="auth-tab" data-tab="register">📝 Register</button>
+            </div>
+
+            <!-- Error / Success Message -->
+            <div class="auth-error" id="authMessage"></div>
+
+            <!-- Login Form -->
+            <form class="auth-form active" id="loginForm" autocomplete="off">
+                <label for="loginNick">Nickname</label>
+                <input type="text" id="loginNick" placeholder="Enter your nickname" required>
+
+                <label for="loginPass">Password</label>
+                <input type="password" id="loginPass" placeholder="Enter your password" required>
+
+                <button type="submit" class="auth-btn">⛏️ Let's Mine!</button>
+            </form>
+
+            <!-- Register Form -->
+            <form class="auth-form" id="registerForm" autocomplete="off">
+                <label for="regNick">Choose a Nickname</label>
+                <input type="text" id="regNick" placeholder="Your unique nickname" required>
+
+                <label for="regPass">Password</label>
+                <input type="password" id="regPass" placeholder="At least 3 characters" required>
+
+                <label for="regConfirm">Confirm Password</label>
+                <input type="password" id="regConfirm" placeholder="Repeat your password" required>
+
+                <button type="submit" class="auth-btn">💎 Create Account</button>
+            </form>
+
+        </div>
+
+    </div>
+
+    <script type="module">
+        import Auth from "static/js/auth.js";
+
+        // ---- DOM refs ----
+        const authMessage = document.getElementById('authMessage');
+        const tabs = document.querySelectorAll('.auth-tab');
+        const loginForm = document.getElementById('loginForm');
+        const registerForm = document.getElementById('registerForm');
+        const loginNick = document.getElementById('loginNick');
+        const loginPass = document.getElementById('loginPass');
+        const regNick = document.getElementById('regNick');
+        const regPass = document.getElementById('regPass');
+        const regConfirm = document.getElementById('regConfirm');
+
+        // ---- Tab switching ----
+        tabs.forEach(tab => {
+            tab.addEventListener('click', () => {
+                tabs.forEach(t => t.classList.remove('active'));
+                tab.classList.add('active');
+
+                const target = tab.dataset.tab;
+                document.querySelectorAll('.auth-form').forEach(f => f.classList.remove('active'));
+                document.getElementById(target + 'Form').classList.add('active');
+
+                authMessage.textContent = '';
+                authMessage.className = 'auth-error';
+            });
+        });
+
+        // ---- Helper: show message ----
+        function showMsg(msg, isError = true) {
+            authMessage.textContent = msg;
+            authMessage.className = isError ? 'auth-error' : 'auth-success';
+        }
+
+        // ---- Login ----
+        loginForm.addEventListener('submit', async (e) => {
+            e.preventDefault();
+            const btn = loginForm.querySelector('.auth-btn');
+            btn.disabled = true;
+            btn.textContent = '⏳ Loading...';
+            showMsg('');
+
+            const result = await Auth.login(loginNick.value, loginPass.value);
+
+            if (result.success) {
+                showMsg('✅ Welcome back, ' + result.user.nickname + '!', false);
+                setTimeout(() => {
+                    window.location.href = '/game';
+                }, 500);
+            } else {
+                showMsg(result.error);
+                btn.disabled = false;
+                btn.textContent = '⛏️ Let\'s Mine!';
+            }
+        });
+
+        // ---- Register ----
+        registerForm.addEventListener('submit', async (e) => {
+            e.preventDefault();
+            const btn = registerForm.querySelector('.auth-btn');
+            btn.disabled = true;
+            btn.textContent = '⏳ Creating...';
+            showMsg('');
+
+            if (regPass.value !== regConfirm.value) {
+                showMsg('Passwords do not match.');
+                btn.disabled = false;
+                btn.textContent = '💎 Create Account';
+                return;
+            }
+
+            const result = await Auth.register(regNick.value, regPass.value);
+
+            if (result.success) {
+                showMsg('✅ Account created! You can now log in.', false);
+                // Switch to login tab
+                document.querySelector('[data-tab="login"]').click();
+                loginNick.value = regNick.value;
+                loginPass.value = '';
+                regNick.value = '';
+                regPass.value = '';
+                regConfirm.value = '';
+            } else {
+                showMsg(result.error);
+            }
+
+            btn.disabled = false;
+            btn.textContent = '💎 Create Account';
+        });
+
+        // ---- Landing Animations: Exploding Bombs & Tearing Hearts ----
+        function spawnLandingEmojis() {
+            // Spawn a bomb explosion
+            if (Math.random() < 0.15) {
+                const bomb = document.createElement('div');
+                bomb.className = 'floating-emoji';
+                bomb.textContent = '💣';
+                bomb.style.left = (5 + Math.random() * 90) + '%';
+                bomb.style.bottom = '-10px';
+                bomb.style.fontSize = (18 + Math.random() * 20) + 'px';
+                bomb.style.setProperty('--float-duration', (4 + Math.random() * 4) + 's');
+                document.body.appendChild(bomb);
+                setTimeout(() => bomb.remove(), 8000);
+            }
+
+            // Spawn a tearing heart
+            if (Math.random() < 0.08) {
+                const heart = document.createElement('div');
+                heart.className = 'tear-heart';
+                heart.textContent = '❤️‍🔥';
+                heart.style.left = (5 + Math.random() * 90) + '%';
+                heart.style.bottom = '-10px';
+                heart.style.fontSize = (20 + Math.random() * 16) + 'px';
+                heart.style.setProperty('--tear-duration', (3 + Math.random() * 3) + 's');
+                document.body.appendChild(heart);
+                setTimeout(() => heart.remove(), 7000);
+            }
+
+            // Also spawn some sparkle diamonds
+            if (Math.random() < 0.1) {
+                const gem = document.createElement('div');
+                gem.className = 'floating-emoji';
+                gem.textContent = '💎';
+                gem.style.left = (5 + Math.random() * 90) + '%';
+                gem.style.bottom = '-10px';
+                gem.style.fontSize = (14 + Math.random() * 14) + 'px';
+                gem.style.setProperty('--float-duration', (5 + Math.random() * 5) + 's');
+                gem.style.opacity = '0.6';
+                document.body.appendChild(gem);
+                setTimeout(() => gem.remove(), 10000);
+            }
+        }
+
+        // Run every 500ms
+        setInterval(spawnLandingEmojis, 500);
+
+        // ---- How to Play Modal ----
+        const howToPlayBtn = document.getElementById('howToPlayBtn');
+        const howToPlayModal = document.getElementById('howToPlayModal');
+        const closeHowToPlay = document.getElementById('closeHowToPlay');
+
+        howToPlayBtn.addEventListener('click', () => {
+            howToPlayModal.classList.add('open');
+        });
+        closeHowToPlay.addEventListener('click', () => {
+            howToPlayModal.classList.remove('open');
+        });
+        howToPlayModal.addEventListener('click', (e) => {
+            if (e.target === howToPlayModal) howToPlayModal.classList.remove('open');
+        });
+        document.addEventListener('keydown', (e) => {
+            if (e.key === 'Escape' && howToPlayModal.classList.contains('open')) {
+                howToPlayModal.classList.remove('open');
+            }
+        });
+
+        // ---- Auto-redirect if already logged in ----
+        const currentUser = Auth.getCurrentUser();
+        if (currentUser) {
+            window.location.href = '/game';
+        }
+    </script>
+</body>
+</html>

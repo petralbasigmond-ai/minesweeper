@@ -1,0 +1,166 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Minesweeper — Ultimate Mining Game</title>
+    <link rel="stylesheet" href="static/css/style.css?v=4">
+    <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>💎</text></svg>">
+</head>
+<body>
+
+    <!-- Background -->
+    <div class="background"></div>
+    <canvas id="particleCanvas"></canvas>
+
+    <!-- Main Container -->
+    <div class="container">
+
+        <!-- User Bar -->
+        <div class="user-bar" id="userBar">
+            <span class="user-info" id="userInfo">⛏️ Mining as: <strong id="userNickname">—</strong></span>
+            <button class="logout-btn" id="logoutBtn">🚪 Logout</button>
+        </div>
+
+        <!-- Top Bar -->
+        <div class="top-bar">
+            <div class="title">
+                MINESWEEPER
+                <span class="title-sub">⛏️ Mine & Conquer</span>
+            </div>
+            <div class="top-controls">
+                <!-- Difficulty Selector -->
+                <div class="difficulty-selector">
+                    <button class="diff-btn active" data-diff="easy">
+                        Easy
+                        <span class="diff-label">6×6</span>
+                    </button>
+                    <button class="diff-btn" data-diff="medium">
+                        Medium
+                        <span class="diff-label">9×9</span>
+                    </button>
+                    <button class="diff-btn" data-diff="hard">
+                        Hard
+                        <span class="diff-label">12×12</span>
+                    </button>
+                </div>
+                <button class="icon-btn" id="helpBtn" title="How to Play" aria-label="How to Play">❓</button>
+            </div>
+        </div>
+
+        <!-- HUD -->
+        <div class="hud">
+            <div class="card card-hearts">
+                <span class="emoji">❤️</span>
+                <div class="number" id="heartsDisplay">3</div>
+                <div class="label">Lives</div>
+            </div>
+            
+            <div class="card card-bombs">
+                <span class="emoji">💣</span>
+                <div class="number" id="bombCount">0</div>
+                <div class="label">Bombs</div>
+            </div>
+            <div class="card card-flags">
+                <span class="emoji">👁️</span>
+                <div class="number" id="flagCount">0</div>
+                <div class="label">Reveals</div>
+            </div>
+            <div class="card card-score">
+                <span class="emoji">💎</span>
+                <div class="number" id="scoreDisplay">0</div>
+                <div class="label">Score</div>
+            </div>
+            <div class="card card-highscore">
+                <span class="emoji">🏆</span>
+                <div class="number" id="highScoreDisplay">0</div>
+                <div class="label">Best <button class="reset-score-btn" id="resetHighScoreBtn" title="Reset best score for this difficulty">↺</button></div>
+            </div>
+        </div>
+
+        <!-- Stats Panel -->
+        <div class="stats-panel" id="statsPanel">
+            <div class="stat-item">
+                <div class="stat-value" id="statGames">0</div>
+                <div class="stat-label">Games</div>
+            </div>
+            <div class="stat-item">
+                <div class="stat-value" id="statWins">0</div>
+                <div class="stat-label">Wins</div>
+            </div>
+            <div class="stat-item">
+                <div class="stat-value" id="statWinRate">0%</div>
+                <div class="stat-label">Win Rate</div>
+            </div>
+            <div class="stat-item">
+                <div class="stat-value" id="statStreak">0</div>
+                <div class="stat-label">Streak</div>
+            </div>
+        </div>
+
+<!-- Flag Toggle Button -->
+        <div class="flag-toggle-container">
+            <button class="flag-toggle-btn" id="flagToggleBtn" title="Toggle Reveal Mode">
+                👁️ <span class="flag-toggle-label">Reveal</span>
+            </button>
+            <span class="flag-toggle-hint">Tap to toggle, then tap a cell</span>
+        </div>
+
+        <!-- Board -->
+        <div id="board"></div>
+
+        <!-- Restart Button -->
+        <button id="restartButton">⛏️ New Game</button>
+
+        <!-- How to Play Button -->
+        <div class="help-section">
+            <button class="help-btn" id="helpBtn2">📖 How to Play</button>
+        </div>
+
+    </div>
+
+    <!-- How to Play Modal -->
+    <div class="modal-overlay" id="helpModal">
+        <div class="modal">
+            <h2>⛏️ How to Mine</h2>
+
+            <h3>🎯 Objective</h3>
+            <p>Clear the minefield without detonating any bombs. Reveal all safe cells to win!</p>
+
+            <h3>🖱️ Controls</h3>
+            <ul>
+                <li><strong>Left-click</strong> — Reveal a cell</li>
+<li><strong>Right-click</strong> — Cycle: 👁️ Reveal Box Content</li>
+            </ul>
+
+            <h3>🎮 Keyboard Shortcuts</h3>
+            <ul>
+                <li><strong>R</strong> — Restart game</li>
+                <li><strong>F</strong> — Toggle reveal mode (click to safely reveal a cell)</li>
+                <li><strong>1 / 2 / 3</strong> — Switch difficulty</li>
+                <li><strong>?</strong> — Toggle this help</li>
+            </ul>
+
+            <h3>💎 Scoring</h3>
+            <ul>
+                <li>Revealing a number adds its value to your score</li>
+                <li><strong>Chording bonus:</strong> +5 points for each chording reveal</li>
+                <li><strong>Speed bonus:</strong> Time-based multiplier for winning fast</li>
+                <li><strong>Difficulties:</strong> Medium score ×1.5, Hard score ×2</li>
+            </ul>
+
+            <h3>📊 Tips</h3>
+            <ul>
+                <li>Numbers tell you how many bombs are adjacent</li>
+                <li>Use flags to mark suspected bombs</li>
+                <li>Question marks help track uncertain cells</li>
+                <li>First click is always safe!</li>
+            </ul>
+
+            <button class="modal-close" id="closeModal">Got it! 💪</button>
+        </div>
+    </div>
+
+    <script type="module" src="static/js/game.js?v=4"></script>
+</body>
+</html>

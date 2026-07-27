@@ -1,0 +1,10 @@
+{
+  "version": 2,
+  "buildCommand": null,
+  "outputDirectory": ".",
+  "routes": [
+    { "src": "^/static/(.*)", "dest": "/static/$1" },
+    { "src": "^/game$", "dest": "/index.html" },
+    { "src": "^/(.*)", "dest": "/landing.html" }
+  ]
+}
