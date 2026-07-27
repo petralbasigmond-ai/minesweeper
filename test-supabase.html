@@ -1,0 +1,26 @@
+<!DOCTYPE html>
+
+<html>
+
+<body>
+
+<h2>Testing Supabase...</h2>
+
+<script type="module">
+
+import { supabase } from "./static/js/supabase.js";
+
+const { data, error } =
+await supabase.auth.getSession();
+
+console.log(data);
+
+console.log(error);
+
+document.body.innerHTML += "<br>Connected Successfully";
+
+</script>
+
+</body>
+
+</html>
