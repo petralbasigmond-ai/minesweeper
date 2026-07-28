@@ -288,8 +288,8 @@
             }
         });
 
-        // ---- Auto-redirect if already logged in ----
-        const currentUser = Auth.getCurrentUser();
+        // ---- Auto-redirect if already logged in (verify with Supabase) ----
+        const currentUser = await Auth.refreshCurrentUser();
         if (currentUser) {
             window.location.href = '/game';
         }

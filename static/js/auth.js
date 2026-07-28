@@ -225,7 +225,14 @@ async getCurrentUser() {
         return JSON.parse(cached);
     }
 
-    return await this.refreshCurrentUser();
+    // No local cache — try refreshing from Supabase
+    const freshUser = await this.refreshCurrentUser();
+    if (!freshUser) {
+        // No valid Supabase session — clear any stale legacy data
+        localStorage.removeItem(LS_CURRENT_KEY);
+        localStorage.removeItem(LS_USERS_KEY);
+    }
+    return freshUser;
 
 },
 
