@@ -189,20 +189,25 @@ const Auth = {
     const currentUser = {
         id: user.id,
         email: user.email,
-        nickname: profile.nickname,
+        nickname: profile?.nickname || 'Miner',
 
-        currentLevel: progress.current_level,
+        currentLevel: progress?.current_level || 'easy',
 
-        easyCompleted: progress.easy_completed,
-        mediumCompleted: progress.medium_completed,
-        hardCompleted: progress.hard_completed,
+        easyCompleted: !!progress?.easy_completed,
+        mediumCompleted: !!progress?.medium_completed,
+        hardCompleted: !!progress?.hard_completed,
 
-        stats: statistics,
+        stats: {
+            games: statistics?.games_played || 0,
+            wins: statistics?.wins || 0,
+            streak: statistics?.current_streak || 0,
+            bestStreak: statistics?.best_streak || 0
+        },
 
         highScores: {
-            easy: progress.easy_highscore,
-            medium: progress.medium_highscore,
-            hard: progress.hard_highscore
+            easy: statistics?.best_easy || 0,
+            medium: statistics?.best_medium || 0,
+            hard: statistics?.best_hard || 0
         }
     };
 
@@ -258,33 +263,33 @@ async saveProgress(update) {
         JSON.stringify(current)
     );
 
-    await updateProgress(current.id, {
+await updateProgress(current.id, {
 
         current_level: current.currentLevel,
 
-        easy_completed: current.easyCompleted,
+        easy_completed: current.easyCompleted ? 1 : 0,
 
-        medium_completed: current.mediumCompleted,
+        medium_completed: current.mediumCompleted ? 1 : 0,
 
-        hard_completed: current.hardCompleted,
-
-        easy_highscore: current.highScores.easy,
-
-        medium_highscore: current.highScores.medium,
-
-        hard_highscore: current.highScores.hard
+        hard_completed: current.hardCompleted ? 1 : 0
 
     });
 
     await updateStatistics(current.id, {
 
-        games: current.stats.games,
+        games_played: current.stats.games,
 
         wins: current.stats.wins,
 
-        streak: current.stats.streak,
+        current_streak: current.stats.streak,
 
-        best_streak: current.stats.bestStreak
+        best_streak: current.stats.bestStreak,
+
+        best_easy: current.highScores.easy,
+
+        best_medium: current.highScores.medium,
+
+        best_hard: current.highScores.hard
 
     });
 
@@ -303,25 +308,25 @@ async refreshCurrentUser() {
     const currentUser = {
         id: user.id,
         email: user.email,
-        nickname: profile.nickname,
+        nickname: profile?.nickname || 'Miner',
 
-        currentLevel: progress.current_level,
+        currentLevel: progress?.current_level || 'easy',
 
-        easyCompleted: progress.easy_completed,
-        mediumCompleted: progress.medium_completed,
-        hardCompleted: progress.hard_completed,
+        easyCompleted: !!progress?.easy_completed,
+        mediumCompleted: !!progress?.medium_completed,
+        hardCompleted: !!progress?.hard_completed,
 
         stats: {
-            games: statistics.games,
-            wins: statistics.wins,
-            streak: statistics.streak,
-            bestStreak: statistics.best_streak
+            games: statistics?.games_played || 0,
+            wins: statistics?.wins || 0,
+            streak: statistics?.current_streak || 0,
+            bestStreak: statistics?.best_streak || 0
         },
 
         highScores: {
-            easy: progress.easy_highscore,
-            medium: progress.medium_highscore,
-            hard: progress.hard_highscore
+            easy: statistics?.best_easy || 0,
+            medium: statistics?.best_medium || 0,
+            hard: statistics?.best_hard || 0
         }
     };
 
@@ -338,7 +343,7 @@ async refreshCurrentUser() {
      * @param {object} user - Supabase user object
      * @returns {{ success: boolean, user: object }}
      */
-    async _buildAndCacheUser(user) {
+async _buildAndCacheUser(user) {
         const { data: profile } = await loadProfile(user.id);
         const { data: progress } = await loadProgress(user.id);
         const { data: statistics } = await loadStatistics(user.id);
@@ -350,21 +355,21 @@ async refreshCurrentUser() {
 
             currentLevel: progress?.current_level || 'easy',
 
-            easyCompleted: progress?.easy_completed || false,
-            mediumCompleted: progress?.medium_completed || false,
-            hardCompleted: progress?.hard_completed || false,
+            easyCompleted: !!progress?.easy_completed,
+            mediumCompleted: !!progress?.medium_completed,
+            hardCompleted: !!progress?.hard_completed,
 
             stats: {
-                games: statistics?.games || 0,
+                games: statistics?.games_played || 0,
                 wins: statistics?.wins || 0,
-                streak: statistics?.streak || 0,
+                streak: statistics?.current_streak || 0,
                 bestStreak: statistics?.best_streak || 0
             },
 
             highScores: {
-                easy: progress?.easy_highscore || 0,
-                medium: progress?.medium_highscore || 0,
-                hard: progress?.hard_highscore || 0
+                easy: statistics?.best_easy || 0,
+                medium: statistics?.best_medium || 0,
+                hard: statistics?.best_hard || 0
             }
         };
 
