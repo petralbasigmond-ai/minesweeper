@@ -14,11 +14,6 @@ if (!currentUser) {
     throw new Error("Not logged in");
 }
 
-if (!currentUser) {
-    window.location.href = "/";
-    throw new Error("Not logged in");
-}
-
 /* ===========================================================
    DOM References
    =========================================================== */
@@ -309,8 +304,6 @@ function drawBoard() {
             div.addEventListener('contextmenu', (e) => {
                 e.preventDefault();
             });
-
-            // Touch: tap to reveal (flag mode or normal), no long-press flagging
         }
     }
 
@@ -469,9 +462,6 @@ function loseLife(hitRow, hitCol) {
         // Full game over with all bombs revealed
         handleGameOver(hitRow, hitCol);
     }
-    // ELSE: No board reset! The player continues playing with the bomb revealed
-    // and one less heart. The revealed bomb cell stays visible.
-    // The timer keeps running. The game continues as normal.
 }
 
 function handleGameOver(hitRow, hitCol) {
@@ -492,12 +482,10 @@ function handleGameOver(hitRow, hitCol) {
     updateStatsUI();
 }
 
-function checkWinCondition() {
+async function checkWinCondition() {
     if (board.checkWin()) {
         gameOver = true;
         timer.stop();
-
-updateScore();
 
         saveHighScore();
 
@@ -510,7 +498,7 @@ updateScore();
         }
         syncStatsToAuth();
 
-// Mark level as completed (unlocks next level)
+        // Mark level as completed (unlocks next level)
         Auth.completeLevel(currentDifficulty);
 
         // Refresh user data for level locking
@@ -559,9 +547,6 @@ function toggleFlagMode() {
 
 /**
  * Flag reveal mode — each click consumes one flag charge to safely reveal a cell.
- * Bombs show as revealed but don't cost a life or affect bomb count.
- * Numbers appear but don't add to score.
- * Flagged cells are marked with 🚩 prefix to distinguish them.
  */
 function handleFlagReveal(row, col) {
     if (gameOver || isExploding) return;
@@ -572,7 +557,6 @@ function handleFlagReveal(row, col) {
     // Check if any flag charges remain
     if (flagCharges <= 0) {
         audio.error();
-        // Auto-disable flag mode
         flagMode = false;
         if (flagToggleBtn) flagToggleBtn.classList.remove('active');
         document.body.style.cursor = '';
@@ -608,8 +592,6 @@ function handleFlagReveal(row, col) {
     if (result.isBomb) {
         audio.explode();
         renderAll(board, result.revealed, row, col);
-        // Do NOT call loseLife(), do NOT decrement hearts/bomb count
-        // If charges depleted, auto-disable flag mode
         if (flagCharges <= 0) {
             flagMode = false;
             if (flagToggleBtn) flagToggleBtn.classList.remove('active');
@@ -622,7 +604,6 @@ function handleFlagReveal(row, col) {
     audio.click();
     renderAll(board, result.revealed);
 
-    // If charges depleted, auto-disable flag mode
     if (flagCharges <= 0) {
         flagMode = false;
         if (flagToggleBtn) flagToggleBtn.classList.remove('active');
@@ -644,7 +625,6 @@ function updateScore() {
 }
 
 function updateFlagCount() {
-    // Show remaining flag charges (how many flag-reveals remain)
     flagCountEl.textContent = Math.max(0, flagCharges);
 }
 
@@ -686,7 +666,6 @@ function triggerExplosion() {
     setTimeout(async () => {
         overlay.remove();
         isExploding = false;
-        // Ask the user if they want to restart instead of automatically restarting
         const playAgain = await showConfirmModal('💥 Game Over! Would you like to play again?');
         if (playAgain) {
             resetGame();
@@ -698,13 +677,11 @@ function triggerExplosion() {
    Win Celebration
    =========================================================== */
 function triggerWinCelebration() {
-    // Banner
     const banner = document.createElement('div');
     banner.className = 'win-banner';
     banner.innerHTML = `<h2>🎉 YOU WIN!</h2><p>Score: ${Math.round(score * board.difficultyMultiplier)}</p>`;
     document.body.appendChild(banner);
 
-    // Confetti
     const container = document.createElement('div');
     container.className = 'win-container';
     document.body.appendChild(container);
@@ -724,7 +701,6 @@ function triggerWinCelebration() {
         container.appendChild(piece);
     }
 
-    // Gold coins
     for (let i = 0; i < 20; i++) {
         const coin = document.createElement('div');
         coin.className = 'coin-piece';
@@ -737,10 +713,8 @@ function triggerWinCelebration() {
         container.appendChild(coin);
     }
 
-    // Show next level prompt after a short delay
     const nextDiff = board.getNextDifficulty();
-    const winModalDelay = setTimeout(() => {
-        // Create a simple overlay for next level
+    setTimeout(() => {
         const nextOverlay = document.createElement('div');
         nextOverlay.className = 'modal-overlay';
         nextOverlay.style.display = 'flex';
@@ -782,7 +756,6 @@ function triggerWinCelebration() {
         nextOverlay.appendChild(winContent);
         document.body.appendChild(nextOverlay);
 
-        // Next level button
         const nextBtn = document.getElementById('nextLevelBtn');
         if (nextBtn) {
             nextBtn.addEventListener('click', () => {
@@ -793,7 +766,6 @@ function triggerWinCelebration() {
             });
         }
 
-        // Replay button
         const replayBtn = document.getElementById('replayLevelBtn');
         if (replayBtn) {
             replayBtn.addEventListener('click', () => {
@@ -805,7 +777,6 @@ function triggerWinCelebration() {
         }
     }, 1500);
 
-    // Remove after animation if modal not interacted with
     setTimeout(() => {
         banner.remove();
         container.remove();
@@ -824,7 +795,6 @@ function resetGame() {
     if (heartsDisplayEl) heartsDisplayEl.textContent = hearts;
     score = 0;
     scoreDisplayEl.textContent = '0';
-    // Set flag charges based on difficulty (e.g., equal to number of mines)
     flagCharges = board.bombs;
     if (flagMode) {
         flagMode = false;
@@ -847,10 +817,8 @@ function setDifficulty(diff) {
         btn.classList.toggle('active', btn.dataset.diff === diff);
     });
 
-    // Save current score as high score for previous difficulty
     saveHighScore();
 
-    // Reload high score for new difficulty
     highScore = loadHighScore();
     highScoreDisplayEl.textContent = highScore;
 
@@ -861,7 +829,6 @@ function setDifficulty(diff) {
     board.initialize();
     hearts = board.hearts;
     if (heartsDisplayEl) heartsDisplayEl.textContent = hearts;
-    // Set flag charges based on difficulty
     flagCharges = board.bombs;
     if (flagMode) {
         flagMode = false;
@@ -1050,7 +1017,7 @@ function initParticles() {
             this.speedX = (Math.random() - 0.5) * 0.3;
             this.speedY = (Math.random() - 0.5) * 0.3 - 0.1;
             this.opacity = Math.random() * 0.5 + 0.1;
-            this.hue = Math.random() > 0.5 ? 45 : 210; // Gold or Blue
+            this.hue = Math.random() > 0.5 ? 45 : 210;
         }
         update() {
             this.x += this.speedX;
@@ -1062,7 +1029,6 @@ function initParticles() {
             ctx.arc(this.x, this.y, this.size, 0, Math.PI * 2);
             ctx.fillStyle = `hsla(${this.hue}, 80%, 60%, ${this.opacity})`;
             ctx.fill();
-            // Glow
             ctx.beginPath();
             ctx.arc(this.x, this.y, this.size * 3, 0, Math.PI * 2);
             ctx.fillStyle = `hsla(${this.hue}, 80%, 60%, ${this.opacity * 0.15})`;
@@ -1082,11 +1048,11 @@ function initParticles() {
         }
         requestAnimationFrame(animate);
     }
-animate();
+    animate();
 }
 
 /* ===========================================================
-   Background Animated Symbols — floating game emojis
+   Background Animated Symbols
    =========================================================== */
 function initBackgroundSymbols() {
     const symbols = [
@@ -1099,7 +1065,6 @@ function initBackgroundSymbols() {
         { emoji: '🪙', cls: 'coin', weight: 4 },
     ];
 
-    // Build weighted pool for random selection
     const pool = [];
     for (const sym of symbols) {
         for (let i = 0; i < sym.weight; i++) pool.push(sym);
@@ -1111,33 +1076,26 @@ function initBackgroundSymbols() {
         el.className = 'bg-symbol ' + sym.cls;
         el.textContent = sym.emoji;
 
-        // Random position across the full height of the viewport (bottom to mid-upper)
-        const left = Math.random() * 95 + 2; // 2%–97%
+        const left = Math.random() * 95 + 2;
         el.style.left = left + '%';
-        el.style.bottom = (Math.random() * 60 + 10) + '%'; // 10%–70% up from bottom
+        el.style.bottom = (Math.random() * 60 + 10) + '%';
 
-        // Random size: medium to large (bigger symbols)
-        const size = 24 + Math.random() * 36; // 24px–60px
+        const size = 24 + Math.random() * 36;
         el.style.fontSize = size + 'px';
 
-        // Random duration (slower for larger symbols)
-        const baseDuration = 6 + Math.random() * 5; // 6s–11s
+        const baseDuration = 6 + Math.random() * 5;
         const duration = baseDuration + (size - 24) * 0.06;
         el.style.setProperty('--sym-duration', duration + 's');
-
-        // Random animation delay (stagger)
         el.style.animationDelay = (Math.random() * 2) + 's';
 
         document.body.appendChild(el);
 
-        // Auto-remove after animation completes + buffer
         const removeMs = (duration + 2) * 1000;
         setTimeout(() => {
             if (el.parentNode) el.remove();
         }, removeMs);
     }
 
-    // Spawn immediately and then on interval
     for (let i = 0; i < 3; i++) setTimeout(spawnSymbol, i * 400);
     setInterval(spawnSymbol, 500 + Math.random() * 400);
 }
