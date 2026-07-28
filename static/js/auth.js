@@ -384,19 +384,26 @@ async _buildAndCacheUser(user) {
         };
     },
 
-    /**
+/**
      * Check if a level is unlocked for the current user.
      * @param {'easy'|'medium'|'hard'} level
      * @returns {boolean}
      */
     isLevelUnlocked(level) {
-        const user = this.getCurrentUser();
-        if (!user) return false;
+        // Note: synchronous getter uses cached localStorage user
+        const cached = localStorage.getItem(LS_CURRENT_KEY);
+        if (!cached) return false;
+        try {
+            const user = JSON.parse(cached);
+            if (!user) return false;
 
-        if (level === 'easy') return true;
-        if (level === 'medium') return user.easyCompleted;
-        if (level === 'hard') return user.mediumCompleted;
-        return false;
+            if (level === 'easy') return true;
+            if (level === 'medium') return !!user.easyCompleted;
+            if (level === 'hard') return !!user.mediumCompleted;
+            return false;
+        } catch (_) {
+            return false;
+        }
     },
 
     /**

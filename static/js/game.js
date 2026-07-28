@@ -497,10 +497,7 @@ function checkWinCondition() {
         gameOver = true;
         timer.stop();
 
-        // Calculate final score with time bonus
-        const timeBonus = Math.max(0, 300 - timer.elapsed) * 0.5;
-        score += Math.round(timeBonus);
-        updateScore();
+updateScore();
 
         saveHighScore();
 
@@ -513,11 +510,11 @@ function checkWinCondition() {
         }
         syncStatsToAuth();
 
-        // Mark level as completed (unlocks next level)
+// Mark level as completed (unlocks next level)
         Auth.completeLevel(currentDifficulty);
 
         // Refresh user data for level locking
-        const updatedUser = Auth.getCurrentUser();
+        const updatedUser = await Auth.getCurrentUser();
         if (updatedUser) {
             // Update highScores in case they changed
             if (updatedUser.highScores) {
