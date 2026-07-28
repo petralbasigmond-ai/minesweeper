@@ -59,8 +59,8 @@
 
             <!-- Login Form -->
             <form class="auth-form active" id="loginForm" autocomplete="off">
-                <label for="loginNick">Nickname</label>
-                <input type="text" id="loginNick" placeholder="Enter your nickname" required>
+                <label for="loginEmail">Email Address</label>
+                <input type="email" id="loginEmail" placeholder="Enter your email" required>
 
                 <label for="loginPass">Password</label>
                 <input type="password" id="loginPass" placeholder="Enter your password" required>
@@ -73,8 +73,11 @@
                 <label for="regNick">Choose a Nickname</label>
                 <input type="text" id="regNick" placeholder="Your unique nickname" required>
 
+                <label for="regEmail">Email Address</label>
+                <input type="email" id="regEmail" placeholder="you@example.com" required>
+
                 <label for="regPass">Password</label>
-                <input type="password" id="regPass" placeholder="At least 3 characters" required>
+                <input type="password" id="regPass" placeholder="At least 6 characters" required>
 
                 <label for="regConfirm">Confirm Password</label>
                 <input type="password" id="regConfirm" placeholder="Repeat your password" required>
@@ -94,9 +97,10 @@
         const tabs = document.querySelectorAll('.auth-tab');
         const loginForm = document.getElementById('loginForm');
         const registerForm = document.getElementById('registerForm');
-        const loginNick = document.getElementById('loginNick');
+        const loginEmail = document.getElementById('loginEmail');
         const loginPass = document.getElementById('loginPass');
         const regNick = document.getElementById('regNick');
+        const regEmail = document.getElementById('regEmail');
         const regPass = document.getElementById('regPass');
         const regConfirm = document.getElementById('regConfirm');
 
@@ -129,7 +133,7 @@
             btn.textContent = '⏳ Loading...';
             showMsg('');
 
-            const result = await Auth.login(loginNick.value, loginPass.value);
+            const result = await Auth.login(loginEmail.value, loginPass.value);
 
             if (result.success) {
                 showMsg('✅ Welcome back, ' + result.user.nickname + '!', false);
@@ -158,15 +162,22 @@
                 return;
             }
 
-            const result = await Auth.register(regNick.value, regPass.value);
+            const result = await Auth.register(regNick.value, regEmail.value, regPass.value);
 
-            if (result.success) {
-                showMsg('✅ Account created! You can now log in.', false);
+            if (result.success && result.user) {
+                // Auto-logged in (email confirmation disabled)
+                showMsg('✅ Welcome, ' + result.user.nickname + '!', false);
+                setTimeout(() => {
+                    window.location.href = '/game';
+                }, 500);
+            } else if (result.success && result.emailConfirmationRequired) {
+                showMsg('✅ Account created! Please check your email to confirm, then log in.', false);
                 // Switch to login tab
                 document.querySelector('[data-tab="login"]').click();
-                loginNick.value = regNick.value;
+                loginEmail.value = regEmail.value;
                 loginPass.value = '';
                 regNick.value = '';
+                regEmail.value = '';
                 regPass.value = '';
                 regConfirm.value = '';
             } else {

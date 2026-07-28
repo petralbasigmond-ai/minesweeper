@@ -15,6 +15,25 @@
  * }
  */
 
+import {
+    register as supabaseRegister,
+    login as supabaseLogin,
+    logout as supabaseLogout,
+    getCurrentUser as getSupabaseUser
+} from "./supabaseAuth.js";
+
+import {
+    createProfile,
+    createDefaultProgress,
+    loadProfile,
+    loadProgress,
+    loadStatistics,
+    nicknameExists,
+    updateProgress,
+    updateStatistics
+} from "./userService.js";
+
+
 const LS_USERS_KEY = 'minesweeperUsers';
 const LS_CURRENT_KEY = 'minesweeperCurrentUser';
 
@@ -64,124 +83,293 @@ const Auth = {
      * @param {string} password
      * @returns {{ success: boolean, error?: string }}
      */
-    async register(nickname, password) {
-        // Validate inputs
-        if (!nickname || !nickname.trim()) {
-            return { success: false, error: 'Nickname is required.' };
-        }
-        if (!password || password.length < 3) {
-            return { success: false, error: 'Password must be at least 3 characters.' };
-        }
-        const trimmedNick = nickname.trim();
+    async register(nickname, email, password) {
 
-        // Check if nickname already exists
-        if (this._findUser(trimmedNick)) {
-            return { success: false, error: 'Nickname already taken. Please choose another.' };
-        }
-
-        const passwordHash = await this.hashPassword(password);
-
-        const users = this.getAllUsers();
-        const newUser = {
-            nickname: trimmedNick,
-            passwordHash,
-            currentLevel: 'easy',
-            easyCompleted: false,
-            mediumCompleted: false,
-            hardCompleted: false,
-            stats: { games: 0, wins: 0, streak: 0, bestStreak: 0 },
-            highScores: { easy: 0, medium: 0, hard: 0 }
+    if (!nickname || !nickname.trim()) {
+        return {
+            success: false,
+            error: "Nickname is required."
         };
-        users.push(newUser);
-        this._saveAllUsers(users);
+    }
 
-        return { success: true };
+    if (!email || !email.trim()) {
+        return {
+            success: false,
+            error: "Email is required."
+        };
+    }
+
+    if (!password || password.length < 6) {
+        return {
+            success: false,
+            error: "Password must be at least 6 characters."
+        };
+    }
+
+    const trimmedNick = nickname.trim();
+    const trimmedEmail = email.trim();
+
+    if (await nicknameExists(trimmedNick)) {
+    return {
+        success: false,
+        error: "Nickname already taken."
+        };
+    }
+
+    const { data, error } =
+        await supabaseRegister(trimmedEmail, password);
+
+    if (error) {
+        return {
+            success: false,
+            error: error.message
+        };
+    }
+
+    const user = data.user;
+
+    if (!user) {
+        // Check if session exists (auto-confirm enabled in Supabase)
+        const session = await getSupabaseUser();
+        if (session) {
+            // Auto-login: session was created immediately
+            await createProfile(session.id, trimmedNick);
+            await createDefaultProgress(session.id);
+            // Load and cache the user data
+            return await this._buildAndCacheUser(session);
+        }
+        return {
+            success: false,
+            error: "Registration failed. Please check your email for a confirmation link if required."
+        };
+    }
+
+    
+
+    await createProfile(user.id, trimmedNick);
+
+    await createDefaultProgress(user.id);
+
+    // Check if a session was created (email confirmation disabled in Supabase)
+    const { data: sessionData } = await import('./supabaseAuth.js').then(m => m.getSession());
+    if (sessionData?.session) {
+        // Auto-login: email confirmation is disabled
+        return await this._buildAndCacheUser(user);
+    }
+
+    return {
+        success: true,
+        emailConfirmationRequired: true
+            };
     },
 
+    async login(email, password) {
+
+    const { data, error } =
+        await supabaseLogin(email, password);
+
+    if (error) {
+        return {
+            success: false,
+            error: error.message
+        };
+    }
+
+    const user = data.user;
+
+    const { data: profile } =
+        await loadProfile(user.id);
+
+    const { data: progress } =
+        await loadProgress(user.id);
+
+    const { data: statistics } =
+        await loadStatistics(user.id);
+
+    const currentUser = {
+        id: user.id,
+        email: user.email,
+        nickname: profile.nickname,
+
+        currentLevel: progress.current_level,
+
+        easyCompleted: progress.easy_completed,
+        mediumCompleted: progress.medium_completed,
+        hardCompleted: progress.hard_completed,
+
+        stats: statistics,
+
+        highScores: {
+            easy: progress.easy_highscore,
+            medium: progress.medium_highscore,
+            hard: progress.hard_highscore
+        }
+    };
+
+    localStorage.setItem(
+        LS_CURRENT_KEY,
+        JSON.stringify(currentUser)
+    );
+
+    return {
+        success: true,
+        user: currentUser
+    };
+},
+
+async getCurrentUser() {
+
+    const cached = localStorage.getItem(LS_CURRENT_KEY);
+
+    if (cached) {
+        return JSON.parse(cached);
+    }
+
+    return await this.refreshCurrentUser();
+
+},
+
+async logout() {
+
+    localStorage.removeItem(LS_CURRENT_KEY);
+
+    await supabaseLogout();
+
+},
+
+async saveProgress(update) {
+
+    const current =
+        await this.getCurrentUser();
+
+    if (!current) return;
+
+    Object.assign(current, update);
+
+    localStorage.setItem(
+        LS_CURRENT_KEY,
+        JSON.stringify(current)
+    );
+
+    await updateProgress(current.id, {
+
+        current_level: current.currentLevel,
+
+        easy_completed: current.easyCompleted,
+
+        medium_completed: current.mediumCompleted,
+
+        hard_completed: current.hardCompleted,
+
+        easy_highscore: current.highScores.easy,
+
+        medium_highscore: current.highScores.medium,
+
+        hard_highscore: current.highScores.hard
+
+    });
+
+    await updateStatistics(current.id, {
+
+        games: current.stats.games,
+
+        wins: current.stats.wins,
+
+        streak: current.stats.streak,
+
+        best_streak: current.stats.bestStreak
+
+    });
+
+},
+
+async refreshCurrentUser() {
+
+    const user = await getSupabaseUser();
+
+    if (!user) return null;
+
+    const { data: profile } = await loadProfile(user.id);
+    const { data: progress } = await loadProgress(user.id);
+    const { data: statistics } = await loadStatistics(user.id);
+
+    const currentUser = {
+        id: user.id,
+        email: user.email,
+        nickname: profile.nickname,
+
+        currentLevel: progress.current_level,
+
+        easyCompleted: progress.easy_completed,
+        mediumCompleted: progress.medium_completed,
+        hardCompleted: progress.hard_completed,
+
+        stats: {
+            games: statistics.games,
+            wins: statistics.wins,
+            streak: statistics.streak,
+            bestStreak: statistics.best_streak
+        },
+
+        highScores: {
+            easy: progress.easy_highscore,
+            medium: progress.medium_highscore,
+            hard: progress.hard_highscore
+        }
+    };
+
+    localStorage.setItem(
+        LS_CURRENT_KEY,
+        JSON.stringify(currentUser)
+    );
+
+    return currentUser;
+},
+
     /**
-     * Log in an existing user.
-     * @param {string} nickname
-     * @param {string} password
-     * @returns {{ success: boolean, error?: string, user?: object }}
+     * Build user object from Supabase user and cache to localStorage.
+     * @param {object} user - Supabase user object
+     * @returns {{ success: boolean, user: object }}
      */
-    async login(nickname, password) {
-        if (!nickname || !nickname.trim()) {
-            return { success: false, error: 'Nickname is required.' };
-        }
-        if (!password) {
-            return { success: false, error: 'Password is required.' };
-        }
+    async _buildAndCacheUser(user) {
+        const { data: profile } = await loadProfile(user.id);
+        const { data: progress } = await loadProgress(user.id);
+        const { data: statistics } = await loadStatistics(user.id);
 
-        const trimmedNick = nickname.trim();
-        const user = this._findUser(trimmedNick);
-        if (!user) {
-            return { success: false, error: 'Account not found. Please register first.' };
-        }
+        const currentUser = {
+            id: user.id,
+            email: user.email,
+            nickname: profile?.nickname || 'Miner',
 
-        const passwordHash = await this.hashPassword(password);
-        if (user.passwordHash !== passwordHash) {
-            return { success: false, error: 'Incorrect password.' };
-        }
+            currentLevel: progress?.current_level || 'easy',
 
-        // Set current user (store a sanitized copy without passwordHash)
-        const currentUser = { ...user };
-        delete currentUser.passwordHash;
-        localStorage.setItem(LS_CURRENT_KEY, JSON.stringify(currentUser));
+            easyCompleted: progress?.easy_completed || false,
+            mediumCompleted: progress?.medium_completed || false,
+            hardCompleted: progress?.hard_completed || false,
 
-        return { success: true, user: currentUser };
-    },
+            stats: {
+                games: statistics?.games || 0,
+                wins: statistics?.wins || 0,
+                streak: statistics?.streak || 0,
+                bestStreak: statistics?.best_streak || 0
+            },
 
-    /**
-     * Log out the current user.
-     */
-    logout() {
-        localStorage.removeItem(LS_CURRENT_KEY);
-    },
+            highScores: {
+                easy: progress?.easy_highscore || 0,
+                medium: progress?.medium_highscore || 0,
+                hard: progress?.hard_highscore || 0
+            }
+        };
 
-    /**
-     * Get the currently logged-in user's data.
-     * @returns {object|null}
-     */
-    getCurrentUser() {
-        try {
-            const raw = localStorage.getItem(LS_CURRENT_KEY);
-            return raw ? JSON.parse(raw) : null;
-        } catch (_) {
-            return null;
-        }
-    },
+        localStorage.setItem(
+            LS_CURRENT_KEY,
+            JSON.stringify(currentUser)
+        );
 
-    /**
-     * Save game progress for the current user.
-     * @param {object} progress - Partial data to merge into user record
-     *   { currentLevel?, easyCompleted?, mediumCompleted?, hardCompleted?, stats?, highScores? }
-     * @returns {boolean} success
-     */
-    saveProgress(progress) {
-        const currentUser = this.getCurrentUser();
-        if (!currentUser) return false;
-
-        const users = this.getAllUsers();
-        const index = users.findIndex(u => u.nickname === currentUser.nickname);
-        if (index === -1) return false;
-
-        // Merge progress into user data
-        Object.assign(users[index], progress);
-
-        // Ensure passwordHash is preserved
-        if (!users[index].passwordHash) {
-            // Re-hash from user input if needed (shouldn't happen)
-            return false;
-        }
-
-        this._saveAllUsers(users);
-
-        // Update current user in localStorage (without passwordHash)
-        const updatedUser = { ...users[index] };
-        delete updatedUser.passwordHash;
-        localStorage.setItem(LS_CURRENT_KEY, JSON.stringify(updatedUser));
-
-        return true;
+        return {
+            success: true,
+            user: currentUser
+        };
     },
 
     /**
@@ -218,4 +406,8 @@ const Auth = {
     }
 };
 
+
+
+
 export default Auth;
+

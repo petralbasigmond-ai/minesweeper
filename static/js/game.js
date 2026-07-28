@@ -7,10 +7,16 @@ import Auth from "./auth.js";
 /* ===========================================================
    Auth Check — redirect to landing if not logged in
    =========================================================== */
-const currentUser = Auth.getCurrentUser();
+const currentUser = await Auth.refreshCurrentUser();
+
 if (!currentUser) {
-    window.location.href = '/';
-    throw new Error('Not logged in');
+    window.location.href = "/";
+    throw new Error("Not logged in");
+}
+
+if (!currentUser) {
+    window.location.href = "/";
+    throw new Error("Not logged in");
 }
 
 /* ===========================================================
@@ -52,7 +58,7 @@ if (logoutBtn) {
     logoutBtn.addEventListener('click', async () => {
         const confirmed = await showConfirmModal('Are you sure you want to logout? Your progress will be saved.');
         if (confirmed) {
-            Auth.logout();
+            await Auth.logout();
             window.location.href = '/';
         }
     });
