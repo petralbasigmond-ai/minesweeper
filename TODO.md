@@ -1,20 +1,23 @@
-# Supabase Integration — Fix Plan
+# Fix: Game Progress & High Score Saving Issues
 
-## Steps Completed ✅
-- [x] 1. `landing.html` (root) — Fixed login form: login uses `loginEmail.value` (was `loginNick.value`), import path uses `./static/js/auth.js`
-- [x] 2. `landing.html` (root) — Added auto-login after registration, `await Auth.refreshCurrentUser()` for redirect check
-- [x] 3. `templates/landing.html` — Fixed `loginNick.value` → `loginEmail.value` (login was broken), fixed import path with `./` prefix
-- [x] 4. `static/js/auth.js` — Added `_buildAndCacheUser()` helper, auto-login after registration (checks session), email confirmation handling
-- [x] 5. `static/js/auth.js` — Fixed data mapping: statistics use correct column names (`games_played`, `current_streak`, `best_streak`, `best_easy`, `best_medium`, `best_hard`), added null-safety with `?.` optional chaining
-- [x] 6. `static/js/auth.js` — `isLevelUnlocked()` now reads from cached localStorage (synchronous), `getCurrentUser()` clears stale localStorage when no Supabase session
-- [x] 7. `static/js/game.js` — **CRITICAL**: Restored missing `checkWinCondition()` function, fixed corrupted `initBackgroundSymbols()` function (had dangling code outside function body)
+## Root Cause
+In `game.js`, `checkWinCondition()` called `saveHighScore()`, `syncStatsToAuth()`, and `Auth.completeLevel()` **without awaiting any of them**. All three called `Auth.saveProgress()` which individually fired Supabase UPDATE queries. Since they ran concurrently, the Supabase queries could complete out of order — e.g., the `updateProgress` from `saveHighScore` (sending `current_level: 'easy'`) could arrive **after** `completeLevel`'s `updateProgress` (sending `current_level: 'medium'`), overwriting the correct data with stale data.
 
-## All Fixes Complete 🔧
-Users can now:
-1. Register with nickname + email + password (Supabase auth + profiles table)
-2. Auto-login immediately if email confirmation is disabled in Supabase
-3. Login with email + password (loads profile, progress, statistics from DB)
-4. Game progress is saved to both localStorage cache and Supabase DB
-5. **No infinite redirect loop**: Landing page verifies session with Supabase before redirecting
-6. **Login works**: Login form uses `loginEmail.value` (not the undefined `loginNick`)
-7. **Game works**: `checkWinCondition()` function is fully restored
+## Changes Made
+
+### 1. `static/js/game.js` - Consolidated saves into single atomic `Auth.saveProgress()` calls
+
+- **`saveHighScore()`**: Changed to return the `{ highScores }` object instead of directly calling `Auth.saveProgress()`. This allows the caller to include high scores in a consolidated update.
+- **`syncStatsToAuth()`**: Made async (awaits `Auth.saveProgress()`).
+- **`checkWinCondition()`**: Now builds a single consolidated update object containing stats, high scores (if new), and level completion flags. Calls `await Auth.saveProgress(update)` **once** — eliminating the race condition.
+- **`handleGameOver()`**: Now builds a single update object with stats and high scores (if new), and calls `await Auth.saveProgress(update)` **once**.
+- **`completeLevel()` logic**: Inlined into `checkWinCondition()` to avoid a separate `Auth.saveProgress()` call.
+
+### 2. `static/js/auth.js` - No changes needed
+The `saveProgress()` function already correctly updates both localStorage and Supabase tables. The issue was that it was being called multiple times concurrently from `game.js`.
+
+## Testing
+- [ ] Login → play Easy level → win → logout → relogin → verify score and level persist
+- [ ] Login → play Easy level → lose → verify stats update
+- [ ] Login → play Easy level → win → verify Medium is unlocked
+

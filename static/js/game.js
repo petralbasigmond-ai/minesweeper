@@ -79,8 +79,8 @@ const timer = new Timer();
    =========================================================== */
 let stats = { ...currentUser.stats };
 
-function syncStatsToAuth() {
-    Auth.saveProgress({ stats });
+async function syncStatsToAuth() {
+    await Auth.saveProgress({ stats });
 }
 
 function updateStatsUI() {
@@ -118,20 +118,23 @@ function loadHighScore() {
 let highScore = loadHighScore();
 highScoreDisplayEl.textContent = highScore;
 
+/**
+ * Returns the updated highScores object if a new high score was achieved, or null otherwise.
+ */
 function saveHighScore() {
     const effectiveScore = Math.round(score * board.difficultyMultiplier);
     if (effectiveScore > highScore) {
         highScore = effectiveScore;
         const highScores = { ...currentUser.highScores, [currentDifficulty]: highScore };
-        Auth.saveProgress({ highScores });
-        // Sync local reference with stored data to prevent stale reads
         currentUser.highScores = highScores;
         highScoreDisplayEl.textContent = highScore;
         // Beat animation
         highScoreDisplayEl.classList.remove('highscore-beat');
         void highScoreDisplayEl.offsetWidth;
         highScoreDisplayEl.classList.add('highscore-beat');
+        return { highScores };
     }
+    return null;
 }
 
 /* ===========================================================
@@ -464,7 +467,7 @@ function loseLife(hitRow, hitCol) {
     }
 }
 
-function handleGameOver(hitRow, hitCol) {
+async function handleGameOver(hitRow, hitCol) {
     gameOver = true;
     timer.stop();
 
@@ -472,13 +475,22 @@ function handleGameOver(hitRow, hitCol) {
     renderAll(board, [], hitRow, hitCol);
 
     audio.explode();
-    saveHighScore();
+    const highScoreResult = saveHighScore();
     triggerExplosion();
 
     // Update stats
     stats.games++;
     stats.streak = 0;
-    syncStatsToAuth();
+
+    // Build update object — only save what changed
+    const update = {
+        stats: { ...stats }
+    };
+    if (highScoreResult) {
+        update.highScores = highScoreResult.highScores;
+    }
+    await Auth.saveProgress(update);
+
     updateStatsUI();
 }
 
@@ -487,28 +499,40 @@ async function checkWinCondition() {
         gameOver = true;
         timer.stop();
 
-        saveHighScore();
-
-        // Stats
+        // Update stats
         stats.games++;
         stats.wins++;
         stats.streak++;
         if (stats.streak > stats.bestStreak) {
             stats.bestStreak = stats.streak;
         }
-        syncStatsToAuth();
+
+        // Check if new high score was achieved
+        const highScoreResult = saveHighScore();
+
+        // Build a single consolidated update object
+        const update = {
+            stats: { ...stats }
+        };
+
+        // Include high scores if a new one was set
+        if (highScoreResult) {
+            update.highScores = highScoreResult.highScores;
+        }
 
         // Mark level as completed (unlocks next level)
-        Auth.completeLevel(currentDifficulty);
-
-        // Refresh user data for level locking
-        const updatedUser = await Auth.getCurrentUser();
-        if (updatedUser) {
-            // Update highScores in case they changed
-            if (updatedUser.highScores) {
-                currentUser.highScores = { ...updatedUser.highScores };
-            }
+        if (currentDifficulty === 'easy') {
+            update.easyCompleted = true;
+            update.currentLevel = 'medium';
+        } else if (currentDifficulty === 'medium') {
+            update.mediumCompleted = true;
+            update.currentLevel = 'hard';
+        } else if (currentDifficulty === 'hard') {
+            update.hardCompleted = true;
         }
+
+        // Single atomic save to both localStorage and Supabase
+        await Auth.saveProgress(update);
 
         updateStatsUI();
         applyLevelLocks();
